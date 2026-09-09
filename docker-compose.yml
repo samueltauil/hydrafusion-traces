@@ -1,0 +1,75 @@
+name: hydrafusion-traces
+
+services:
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.115.1
+    command: ["--config=/etc/otel/config.yaml"]
+    volumes:
+      - ./config/otel-collector.yaml:/etc/otel/config.yaml:ro
+    ports:
+      # Loopback only. This stack has no authentication anywhere.
+      - "127.0.0.1:4317:4317"
+      - "127.0.0.1:4318:4318"
+    depends_on:
+      - tempo
+      - prometheus
+
+  tempo:
+    image: grafana/tempo:2.6.1
+    command: ["-config.file=/etc/tempo/tempo.yaml"]
+    # The image's default uid cannot write to a fresh named volume.
+    user: "0:0"
+    volumes:
+      - ./config/tempo.yaml:/etc/tempo/tempo.yaml:ro
+      - tempo-data:/var/tempo
+    ports:
+      - "127.0.0.1:3200:3200"
+
+  prometheus:
+    image: prom/prometheus:v3.0.1
+    command:
+      - --config.file=/etc/prometheus/prometheus.yaml
+      - --web.enable-remote-write-receiver
+      - --storage.tsdb.retention.time=7d
+    volumes:
+      - ./config/prometheus.yaml:/etc/prometheus/prometheus.yaml:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "127.0.0.1:9090:9090"
+
+  fusion-tailer:
+    build: ./tailer
+    environment:
+      COPILOT_STATE_DIR: /session-state
+      OTLP_ENDPOINT: http://otel-collector:4318
+      # Replay every session already on disk instead of following new ones only.
+      BACKFILL: "${BACKFILL:-false}"
+    volumes:
+      - "${COPILOT_STATE_DIR:-${HOME:-${USERPROFILE}}/.copilot/session-state}:/session-state:ro"
+    depends_on:
+      - otel-collector
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:11.4.0
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+      GF_USERS_DEFAULT_THEME: dark
+      GF_FEATURE_TOGGLES_ENABLE: traceqlEditor
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/hydrafusion.json
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      - tempo
+      - prometheus
+
+volumes:
+  tempo-data:
+  prometheus-data:
+  grafana-data:

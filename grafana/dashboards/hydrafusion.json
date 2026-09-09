@@ -1,0 +1,747 @@
+{
+  "uid": "hydrafusion",
+  "title": "HydraFusion",
+  "description": "Which models GitHub Copilot CLI's HydraFusion ran for each turn, and what each leg cost. Reconstructed from the CLI's own session event log, which records the detail that the OpenTelemetry GenAI conventions have no field for.",
+  "tags": ["copilot", "hydrafusion", "genai"],
+  "timezone": "browser",
+  "style": "dark",
+  "editable": true,
+  "graphTooltip": 1,
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "10s",
+  "time": { "from": "now-6h", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "session",
+        "label": "Session",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "query": { "qryType": 1, "query": "label_values(hydrafusion_fusion_count, session)", "refId": "session" },
+        "definition": "label_values(hydrafusion_fusion_count, session)",
+        "refresh": 2,
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": { "selected": true, "text": ["All"], "value": ["$__all"] }
+      },
+      {
+        "name": "traceId",
+        "label": "Trace ID",
+        "type": "textbox",
+        "hide": 2,
+        "query": "{ span.hydrafusion.phase_count > 0 }",
+        "current": { "selected": false, "text": "{ span.hydrafusion.phase_count > 0 }", "value": "{ span.hydrafusion.phase_count > 0 }" },
+        "description": "Set by clicking a row in the Turns table. The default is a TraceQL search, which the waterfall cannot render, so the panel stays empty until a turn is picked."
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "text",
+      "transparent": true,
+      "gridPos": { "h": 3, "w": 24, "x": 0, "y": 0 },
+      "options": {
+        "mode": "markdown",
+        "content": "<div style=\"display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;border-left:3px solid #a371f7;padding-left:14px\"><span style=\"font-size:19px;font-weight:600;color:#e6edf3\">Each turn below reached OpenTelemetry as one <code>chat</code> call to <code>hydrafusion</code>.</span><span style=\"color:#8b949e\">That is faithful to the GenAI semantic conventions, which have no field for a router that fans one request across several models. The per-leg detail here is reconstructed from the CLI's own session log at <code>~/.copilot/session-state/&lt;id&gt;/events.jsonl</code>. Stat totals are cumulative since the tailer started; the table and waterfall follow the time picker.</span></div>"
+      }
+    },
+
+    {
+      "id": 100,
+      "type": "row",
+      "title": "Is it actually compounding?",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 3 },
+      "panels": []
+    },
+    {
+      "id": 10,
+      "type": "stat",
+      "title": "Compound workflow rate",
+      "description": "Share of turns that ran more than one distinct model. A 'single' turn uses one model end to end; 'cascade' and 'critique' bring in a second. The CLI reports the turn, not the legs, so this is not visible from the client.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 5, "w": 6, "x": 0, "y": 4 },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum(hydrafusion_fusion_compound_count{session=~\"$session\"}) / clamp_min(sum(hydrafusion_fusion_count{session=~\"$session\"}), 1)",
+          "instant": true
+        }
+      ],
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "colorMode": "background_solid",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center",
+        "wideLayout": true
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "decimals": 0,
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "#30363d", "value": null },
+              { "color": "#6e40c9", "value": 0.001 },
+              { "color": "#a371f7", "value": 0.5 }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 15,
+      "type": "stat",
+      "title": "Judge rejection rate",
+      "description": "Of the fusion legs that acted as a judge, the share that returned 'reject' and handed the work to a repair phase. A rejection means the quality gate did its job. A persistently high rate would suggest the drafting model is mismatched to the work.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 5, "w": 5, "x": 6, "y": 4 },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum(hydrafusion_phase_count{session=~\"$session\", role=\"judge\", verdict=\"reject\"}) / clamp_min(sum(hydrafusion_phase_count{session=~\"$session\", role=\"judge\"}), 1)",
+          "instant": true
+        }
+      ],
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "decimals": 0,
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "#3fb950", "value": null },
+              { "color": "#d29922", "value": 0.34 },
+              { "color": "#f85149", "value": 0.67 }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 16,
+      "type": "stat",
+      "title": "Overhead share",
+      "description": "One leg per turn produces the answer you receive. This is the share of credits spent on the others: reviews, and drafts that were superseded. Not pure waste, since a draft and its critique feed the context of the leg that follows, but it is the part of the bill that buys review rather than output.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 5, "w": 5, "x": 11, "y": 4 },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum(hydrafusion_fusion_uncommitted_aiu{session=~\"$session\"}) / clamp_min(sum(hydrafusion_fusion_aiu{session=~\"$session\"}), 0.0001)",
+          "instant": true
+        }
+      ],
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "decimals": 0,
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "#3fb950", "value": null },
+              { "color": "#d29922", "value": 0.1 },
+              { "color": "#f85149", "value": 0.25 }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 12,
+      "type": "stat",
+      "title": "Total AIU",
+      "description": "Sum of github.copilot.nano_aiu on fusion turn totals, divided by 1e9. Turn totals only. The per-phase values are the parts of these numbers; adding both would double count.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 5, "w": 3, "x": 16, "y": 4 },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum(hydrafusion_fusion_aiu{session=~\"$session\"})",
+          "instant": true
+        }
+      ],
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center"
+      },
+      "fieldConfig": {
+        "defaults": { "unit": "none", "decimals": 1, "color": { "mode": "fixed", "fixedColor": "#d29922" } },
+        "overrides": []
+      }
+    },
+    {
+      "id": 13,
+      "type": "stat",
+      "title": "Turns",
+      "description": "Fusion turns observed. One fusion is resolved per user prompt, not per model round-trip, so this counts prompts.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 5, "w": 2, "x": 19, "y": 4 },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum(hydrafusion_fusion_count{session=~\"$session\"})",
+          "instant": true
+        }
+      ],
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center"
+      },
+      "fieldConfig": {
+        "defaults": { "unit": "none", "decimals": 0, "color": { "mode": "fixed", "fixedColor": "#8b949e" } },
+        "overrides": []
+      }
+    },
+    {
+      "id": 14,
+      "type": "stat",
+      "title": "Mean turn",
+      "description": "Mean wall-clock duration of a fusion turn, including every phase and the tool calls between them.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 5, "w": 3, "x": 21, "y": 4 },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum(hydrafusion_fusion_duration{session=~\"$session\"}) / clamp_min(sum(hydrafusion_fusion_count{session=~\"$session\"}), 1)",
+          "instant": true
+        }
+      ],
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "colorMode": "value",
+        "graphMode": "none",
+        "textMode": "value",
+        "justifyMode": "center"
+      },
+      "fieldConfig": {
+        "defaults": { "unit": "s", "decimals": 0, "color": { "mode": "fixed", "fixedColor": "#8b949e" } },
+        "overrides": []
+      }
+    },
+
+    {
+      "id": 101,
+      "type": "row",
+      "title": "Who did the work?",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 9 },
+      "panels": []
+    },
+    {
+      "id": 20,
+      "type": "piechart",
+      "title": "AIU share by model",
+      "description": "Cost attributed to the model that ran each leg. Phase-level values, so the slices add up to the session total. The CLI bills the turn as a whole, so this split is only available from the session log.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 12, "w": 7, "x": 0, "y": 10 },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum by (model) (hydrafusion_phase_aiu{session=~\"$session\"})",
+          "legendFormat": "{{model}}",
+          "instant": true
+        }
+      ],
+      "options": {
+        "pieType": "donut",
+        "displayLabels": [],
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "legend": { "displayMode": "table", "placement": "bottom", "showLegend": true, "values": ["value", "percent"] },
+        "tooltip": { "mode": "single", "sort": "none" }
+      },
+      "fieldConfig": {
+        "defaults": { "unit": "none", "decimals": 2, "color": { "mode": "palette-classic-by-name" } },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "gpt-5.6-sol" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "#a371f7" } }] },
+          { "matcher": { "id": "byName", "options": "gpt-5.6-luna" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "#58a6ff" } }] },
+          { "matcher": { "id": "byName", "options": "gpt-5.6-terra" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "#39c5cf" } }] },
+          { "matcher": { "id": "byName", "options": "claude-opus-5" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "#db6d28" } }] },
+          { "matcher": { "id": "byName", "options": "mai-code-1.1-flash" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "#3fb950" } }] }
+        ]
+      }
+    },
+    {
+      "id": 21,
+      "type": "table",
+      "title": "Models",
+      "description": "Every model the router reached for. 'Legs' counts fusion phases, not inference calls. Cached input is billed differently from fresh input, which is why credits and tokens do not move together.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 12, "w": 9, "x": 7, "y": 10 },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum by (model) (hydrafusion_phase_count{session=~\"$session\"})", "instant": true, "format": "table" },
+        { "refId": "B", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum by (model) (hydrafusion_phase_aiu{session=~\"$session\"})", "instant": true, "format": "table" },
+        { "refId": "C", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum by (model) (hydrafusion_tokens{session=~\"$session\", type=\"input\"})", "instant": true, "format": "table" },
+        { "refId": "D", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum by (model) (hydrafusion_tokens{session=~\"$session\", type=\"output\"})", "instant": true, "format": "table" }
+      ],
+      "transformations": [
+        { "id": "merge", "options": {} },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": { "Time": true },
+            "indexByName": { "model": 0, "Value #A": 1, "Value #B": 2, "Value #C": 3, "Value #D": 4 },
+            "renameByName": { "model": "Model", "Value #A": "Legs", "Value #B": "AIU", "Value #C": "In", "Value #D": "Out" }
+          }
+        },
+        { "id": "sortBy", "options": { "sort": [{ "field": "AIU", "desc": true }] } }
+      ],
+      "options": { "showHeader": true, "cellHeight": "sm" },
+      "fieldConfig": {
+        "defaults": { "custom": { "align": "auto", "filterable": false } },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Model" },
+            "properties": [
+              { "id": "custom.cellOptions", "value": { "type": "color-text" } },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "gpt-5.6-sol": { "color": "#a371f7", "index": 0 },
+                      "gpt-5.6-luna": { "color": "#58a6ff", "index": 1 },
+                      "gpt-5.6-terra": { "color": "#39c5cf", "index": 2 },
+                      "claude-opus-5": { "color": "#db6d28", "index": 3 },
+                      "mai-code-1.1-flash": { "color": "#3fb950", "index": 4 }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          { "matcher": { "id": "byName", "options": "Legs" }, "properties": [{ "id": "custom.width", "value": 60 }] },
+          {
+            "matcher": { "id": "byName", "options": "AIU" },
+            "properties": [
+              { "id": "decimals", "value": 2 },
+              { "id": "custom.width", "value": 80 },
+              { "id": "custom.cellOptions", "value": { "type": "color-text" } },
+              { "id": "color", "value": { "mode": "continuous-YlRd" } }
+            ]
+          },
+          { "matcher": { "id": "byRegexp", "options": "In|Out" }, "properties": [{ "id": "unit", "value": "short" }, { "id": "decimals", "value": 1 }, { "id": "custom.width", "value": 70 }] }
+        ]
+      }
+    },
+    {
+      "id": 22,
+      "type": "table",
+      "title": "Phase ledger",
+      "description": "Every fusion leg the router ran, grouped by model and phase kind. A 'judge' row with verdict 'reject' means the quality gate caught a weak draft and handed the work to a repair phase.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 12, "w": 8, "x": 16, "y": 10 },
+      "targets": [
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum by (model, kind, role, verdict) (hydrafusion_phase_count{session=~\"$session\"})", "instant": true, "format": "table" },
+        { "refId": "B", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum by (model, kind, role, verdict) (hydrafusion_phase_aiu{session=~\"$session\"})", "instant": true, "format": "table" }
+      ],
+      "transformations": [
+        { "id": "merge", "options": {} },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": { "Time": true, "role": true },
+            "indexByName": { "model": 0, "kind": 1, "verdict": 2, "Value #A": 3, "Value #B": 4 },
+            "renameByName": { "model": "Model", "kind": "Phase", "verdict": "Verdict", "Value #A": "Legs", "Value #B": "AIU" }
+          }
+        },
+        { "id": "sortBy", "options": { "sort": [{ "field": "AIU", "desc": true }] } }
+      ],
+      "options": { "showHeader": true, "cellHeight": "sm" },
+      "fieldConfig": {
+        "defaults": { "custom": { "align": "auto", "filterable": false } },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Model" },
+            "properties": [
+              { "id": "custom.cellOptions", "value": { "type": "color-text" } },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "gpt-5.6-sol": { "color": "#a371f7", "index": 0 },
+                      "gpt-5.6-luna": { "color": "#58a6ff", "index": 1 },
+                      "gpt-5.6-terra": { "color": "#39c5cf", "index": 2 },
+                      "claude-opus-5": { "color": "#db6d28", "index": 3 },
+                      "mai-code-1.1-flash": { "color": "#3fb950", "index": 4 }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Phase" },
+            "properties": [
+              { "id": "custom.width", "value": 85 },
+              { "id": "custom.cellOptions", "value": { "type": "color-text" } },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "primary": { "color": "#8b949e", "index": 0 },
+                      "draft": { "color": "#8b949e", "index": 1 },
+                      "judge": { "color": "#d29922", "index": 2 },
+                      "critic": { "color": "#d29922", "index": 3 },
+                      "repair": { "color": "#f85149", "index": 4 }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Verdict" },
+            "properties": [
+              { "id": "custom.width", "value": 75 },
+              {
+                "id": "mappings",
+                "value": [
+                  { "type": "value", "options": { "none": { "text": "—", "color": "#484f58", "index": 0 }, "reject": { "text": "reject", "color": "#f85149", "index": 1 }, "accept": { "text": "accept", "color": "#3fb950", "index": 2 } } }
+                ]
+              },
+              { "id": "custom.cellOptions", "value": { "type": "color-text" } }
+            ]
+          },
+          { "matcher": { "id": "byName", "options": "Legs" }, "properties": [{ "id": "custom.width", "value": 55 }] },
+          {
+            "matcher": { "id": "byName", "options": "AIU" },
+            "properties": [
+              { "id": "decimals", "value": 2 },
+              { "id": "custom.width", "value": 70 },
+              { "id": "custom.cellOptions", "value": { "type": "color-text" } },
+              { "id": "color", "value": { "mode": "continuous-YlRd" } }
+            ]
+          }
+        ]
+      }
+    },
+
+    {
+      "id": 102,
+      "type": "row",
+      "title": "What did it cost?",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 22 },
+      "panels": []
+    },
+    {
+      "id": 30,
+      "type": "timeseries",
+      "title": "AIU per turn",
+      "description": "Every fusion turn plotted at the moment it ran, read straight from the reconstructed traces so it respects the time picker exactly. Hover a point to see the turn, then find it in the table below.",
+      "datasource": { "type": "tempo", "uid": "tempo" },
+      "gridPos": { "h": 8, "w": 14, "x": 0, "y": 23 },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "tempo", "uid": "tempo" },
+          "queryType": "traceql",
+          "query": "{ span.hydrafusion.phase_count > 0 } | select(span.hydrafusion.aiu, span.hydrafusion.pattern)",
+          "tableType": "spans",
+          "limit": 500,
+          "filters": []
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": { "traceIdHidden": true, "traceService": true, "traceName": true, "spanID": true, "Duration": true, "hydrafusion.pattern": true },
+            "renameByName": { "hydrafusion.aiu": "AIU per turn" }
+          }
+        },
+        {
+          "id": "convertFieldType",
+          "options": {
+            "fields": {},
+            "conversions": [
+              { "targetField": "Start time", "destinationType": "time" },
+              { "targetField": "AIU per turn", "destinationType": "number" }
+            ]
+          }
+        }
+      ],
+      "options": {
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": false },
+        "tooltip": { "mode": "single", "sort": "none" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "decimals": 2,
+          "color": { "mode": "fixed", "fixedColor": "#d29922" },
+          "custom": {
+            "drawStyle": "points",
+            "pointSize": 12,
+            "showPoints": "always",
+            "lineWidth": 0,
+            "fillOpacity": 0,
+            "axisSoftMin": 0,
+            "gradientMode": "none",
+            "spanNulls": false,
+            "axisLabel": "AIU"
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 31,
+      "type": "bargauge",
+      "title": "Where the credits went",
+      "description": "AIU by phase kind. 'primary' and 'draft' are first attempts. 'judge' and 'critic' are review passes; 'repair' is a second attempt after a judge rejected the first. A turn routed to 'single' has only a primary.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 10, "x": 14, "y": 23 },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum(hydrafusion_phase_aiu{session=~\"$session\", kind=\"primary\"}) > 0",
+          "legendFormat": "primary",
+          "instant": true
+        },
+        {
+          "refId": "B",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum(hydrafusion_phase_aiu{session=~\"$session\", kind=\"draft\"}) > 0",
+          "legendFormat": "draft",
+          "instant": true
+        },
+        {
+          "refId": "C",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum(hydrafusion_phase_aiu{session=~\"$session\", kind=\"judge\"}) > 0",
+          "legendFormat": "judge",
+          "instant": true
+        },
+        {
+          "refId": "D",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum(hydrafusion_phase_aiu{session=~\"$session\", kind=\"critic\"}) > 0",
+          "legendFormat": "critic",
+          "instant": true
+        },
+        {
+          "refId": "E",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum(hydrafusion_phase_aiu{session=~\"$session\", kind=\"repair\"}) > 0",
+          "legendFormat": "repair",
+          "instant": true
+        },
+        {
+          "refId": "F",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum by (kind) (hydrafusion_phase_aiu{session=~\"$session\", kind!~\"primary|draft|judge|critic|repair\"}) > 0",
+          "legendFormat": "{{kind}}",
+          "instant": true
+        }
+      ],
+      "options": {
+        "displayMode": "basic",
+        "orientation": "horizontal",
+        "valueMode": "text",
+        "showUnfilled": true,
+        "minVizWidth": 8,
+        "minVizHeight": 16,
+        "sizing": "auto",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "legend": { "showLegend": false }
+      },
+      "fieldConfig": {
+        "defaults": { "unit": "none", "decimals": 2, "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [{ "color": "#8b949e", "value": null }] } },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "primary" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "#8b949e" } }] },
+          { "matcher": { "id": "byName", "options": "draft" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "#8b949e" } }] },
+          { "matcher": { "id": "byName", "options": "judge" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "#d29922" } }] },
+          { "matcher": { "id": "byName", "options": "critic" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "#d29922" } }] },
+          { "matcher": { "id": "byName", "options": "repair" }, "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "#f85149" } }] }
+        ]
+      }
+    },
+
+    {
+      "id": 103,
+      "type": "row",
+      "title": "One turn in detail",
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 31 },
+      "panels": []
+    },
+    {
+      "id": 40,
+      "type": "table",
+      "title": "Turns",
+      "description": "One row per fusion turn, read back out of Tempo. Click any cell to load that turn's waterfall below. A row with two names under Models is a compound workflow.",
+      "datasource": { "type": "tempo", "uid": "tempo" },
+      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 32 },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "tempo", "uid": "tempo" },
+          "queryType": "traceql",
+          "query": "{ span.hydrafusion.phase_count > 0 } | select(span.hydrafusion.pattern, span.hydrafusion.models, span.hydrafusion.phase_count, span.hydrafusion.aiu, span.hydrafusion.uncommitted_aiu, span.gen_ai.usage.request_count, span.hydrafusion.routing_latency_ms, span.hydrafusion.outcome)",
+          "tableType": "spans",
+          "limit": 100,
+          "filters": []
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": { "traceService": true, "traceName": true, "spanID": true },
+            "indexByName": {
+              "Start time": 0,
+              "hydrafusion.pattern": 1,
+              "hydrafusion.models": 2,
+              "hydrafusion.phase_count": 3,
+              "hydrafusion.aiu": 4,
+              "hydrafusion.uncommitted_aiu": 5,
+              "gen_ai.usage.request_count": 6,
+              "Duration": 7,
+              "hydrafusion.routing_latency_ms": 8,
+              "hydrafusion.outcome": 9
+            },
+            "renameByName": {
+              "hydrafusion.pattern": "Pattern",
+              "hydrafusion.models": "Models",
+              "hydrafusion.phase_count": "Legs",
+              "hydrafusion.aiu": "AIU",
+              "hydrafusion.uncommitted_aiu": "Overhead",
+              "gen_ai.usage.request_count": "Inference calls",
+              "hydrafusion.routing_latency_ms": "Routing",
+              "hydrafusion.outcome": "Outcome"
+            }
+          }
+        }
+      ],
+      "options": { "showHeader": true, "cellHeight": "sm" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "align": "auto", "filterable": true },
+          "links": [
+            {
+              "title": "Show this turn's waterfall",
+              "url": "/d/hydrafusion/hydrafusion?var-traceId=${__data.fields.traceIdHidden}&${session:queryparam}&${__url_time_range}"
+            }
+          ]
+        },
+        "overrides": [
+          { "matcher": { "id": "byName", "options": "Start time" }, "properties": [{ "id": "custom.width", "value": 185 }] },
+          {
+            "matcher": { "id": "byName", "options": "Pattern" },
+            "properties": [
+              { "id": "custom.width", "value": 105 },
+              {
+                "id": "mappings",
+                "value": [
+                  { "type": "value", "options": { "single": { "text": "single", "color": "#8b949e", "index": 0 }, "cascade": { "text": "cascade", "color": "#a371f7", "index": 1 }, "critique": { "text": "critique", "color": "#58a6ff", "index": 2 } } }
+                ]
+              },
+              { "id": "custom.cellOptions", "value": { "type": "color-background", "mode": "gradient", "applyToRow": false } }
+            ]
+          },
+          { "matcher": { "id": "byName", "options": "Models" }, "properties": [{ "id": "custom.minWidth", "value": 260 }] },
+          { "matcher": { "id": "byName", "options": "Legs" }, "properties": [{ "id": "custom.width", "value": 65 }] },
+          {
+            "matcher": { "id": "byName", "options": "AIU" },
+            "properties": [
+              { "id": "unit", "value": "none" },
+              { "id": "decimals", "value": 2 },
+              { "id": "custom.width", "value": 100 },
+              { "id": "custom.cellOptions", "value": { "type": "color-text" } },
+              { "id": "color", "value": { "mode": "continuous-YlRd" } }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Overhead" },
+            "properties": [
+              { "id": "unit", "value": "none" },
+              { "id": "decimals", "value": 2 },
+              { "id": "custom.width", "value": 100 },
+              { "id": "custom.cellOptions", "value": { "type": "color-text" } },
+              { "id": "color", "value": { "mode": "continuous-GrYlRd" } }
+            ]
+          },
+          { "matcher": { "id": "byName", "options": "Inference calls" }, "properties": [{ "id": "custom.width", "value": 140 }] },
+          {
+            "matcher": { "id": "byName", "options": "Routing" },
+            "properties": [{ "id": "unit", "value": "ms" }, { "id": "decimals", "value": 0 }, { "id": "custom.width", "value": 100 }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "Outcome" },
+            "properties": [
+              { "id": "custom.width", "value": 110 },
+              { "id": "mappings", "value": [{ "type": "value", "options": { "completed": { "color": "#3fb950", "index": 0 } } }] },
+              { "id": "custom.cellOptions", "value": { "type": "color-text" } }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 50,
+      "type": "traces",
+      "title": "Fusion waterfall",
+      "description": "One turn, reconstructed. The root span is the turn; each child is one fusion leg named for the model that ran it. A cascade reads top to bottom as draft, judge, repair. Click a row in the table above to load one.",
+      "datasource": { "type": "tempo", "uid": "tempo" },
+      "gridPos": { "h": 13, "w": 24, "x": 0, "y": 44 },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "tempo", "uid": "tempo" },
+          "queryType": "traceql",
+          "query": "$traceId",
+          "limit": 200,
+          "filters": []
+        }
+      ],
+      "options": {}
+    }
+  ]
+}

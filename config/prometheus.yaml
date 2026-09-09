@@ -1,0 +1,10 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+# Everything arrives by remote write from the OTel collector. Nothing is
+# scraped, so there are no scrape_configs.
+storage:
+  tsdb:
+    # The tailer can replay sessions recorded before the stack was started.
+    out_of_order_time_window: 1h
