@@ -64,14 +64,13 @@ Compound workflow rate was 25%: six of twenty-four turns used more than one mode
 | `mai-code-1.1-flash` | 0.92 | 0.3% | 2 |
 | `gpt-5.6-terra` | 0.19 | 0.1% | 1 |
 
-Three of these are not in the CLI's public model list, which is unsurprising for a preview
-that is explicitly about routing across a private pool. `claude-opus-5` appeared only for
-the heaviest tasks in the set — multi-file refactors and a delete-and-verify pass — and
-took 42% of total spend across three legs.
+`claude-opus-5` appeared only for the heaviest tasks in the set — multi-file refactors and
+a delete-and-verify pass — and took 42% of total spend across three legs.
 
-The interesting thing is not the leaderboard, which is meaningless at this sample size.
-It is that the pool is heterogeneous across vendors and that the router reaches into it
-per phase rather than per session.
+Treat those identifiers as routing labels observed in a preview, not as product names.
+They will change. The point of the table is that the pool is heterogeneous across vendors
+and that the router reaches into it per phase rather than per session, not the leaderboard,
+which is meaningless at this sample size.
 
 ## Two compound patterns with different shapes
 

@@ -208,7 +208,7 @@ has one seeded off-by-one bug. Run the CLI with `-C sandbox` to reproduce the tu
 
 ## Preview notes
 
-Rough edges you are likely to hit, all consistent with an unreleased feature:
+Rough edges you are likely to hit, all consistent with a preview:
 
 - `--model hydrafusion` needs `COPILOT_CLI_ENABLED_FEATURE_FLAGS=HYDRAFUSION_ROLLOUT`.
   `--experimental` alone is not enough. This is preview gating, not a bug.
