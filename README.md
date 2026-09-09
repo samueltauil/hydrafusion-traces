@@ -27,7 +27,8 @@ rebuilds each turn as a trace with one span per fusion leg, and points Grafana a
 
 ## Quickstart
 
-You need Docker, and GitHub Copilot CLI 1.0.83+ authenticated with HydraFusion access.
+You need Docker, and an authenticated GitHub Copilot CLI 1.0.83+ with experimental
+features on (`/experimental on`, then pick HydraFusion from `/model`).
 (For a look around without either, skip to [demo mode](#just-want-to-look-around).)
 
 Three steps. There is nothing to configure and no file to edit.
@@ -43,14 +44,12 @@ docker compose up -d
 ```bash
 # macOS / Linux
 export OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
-export COPILOT_CLI_ENABLED_FEATURE_FLAGS=HYDRAFUSION_ROLLOUT
 copilot --model hydrafusion
 ```
 
 ```powershell
 # Windows PowerShell
 $env:OTEL_EXPORTER_OTLP_ENDPOINT = "http://localhost:4318"
-$env:COPILOT_CLI_ENABLED_FEATURE_FLAGS = "HYDRAFUSION_ROLLOUT"
 copilot --model hydrafusion
 ```
 
@@ -113,7 +112,7 @@ Either way the dashboard and datasources reprovision themselves on the next `up`
 | Symptom | Cause |
 |---|---|
 | Dashboard is empty | The tailer only sees turns that happen after it starts. Run a turn, or enable `BACKFILL` above. |
-| `--model hydrafusion` is rejected | `COPILOT_CLI_ENABLED_FEATURE_FLAGS=HYDRAFUSION_ROLLOUT` must be set. `--experimental` is not enough. |
+| `--model hydrafusion` is rejected | Your CLI is too old, or experimental features are off. Run `/update`, then `/experimental on`, and pick HydraFusion from `/model`. |
 | Tailer logs "session state directory not found" | Your CLI keeps state somewhere other than `~/.copilot/session-state`. Put `COPILOT_STATE_DIR=/your/path` in `.env`. |
 | Port already in use | The stack binds 3000, 4317, 4318, 9090 and 3200 on `127.0.0.1`. |
 
@@ -214,8 +213,9 @@ has one seeded off-by-one bug. Run the CLI with `-C sandbox` to reproduce the tu
 
 Rough edges you are likely to hit, all consistent with a preview:
 
-- `--model hydrafusion` needs `COPILOT_CLI_ENABLED_FEATURE_FLAGS=HYDRAFUSION_ROLLOUT`.
-  `--experimental` alone is not enough. This is preview gating, not a bug.
+- Early builds gated `--model hydrafusion` behind
+  `COPILOT_CLI_ENABLED_FEATURE_FLAGS=HYDRAFUSION_ROLLOUT`. That flag is no longer needed:
+  the rollout is open to all plans in the CLI, and `/experimental on` is enough.
 - Selecting HydraFusion in plan mode reverts to the previous model.
 - In the runs observed here, `chat` spans lasted a few milliseconds regardless of
   inference time, so they appear to cover client-side request handling rather than the

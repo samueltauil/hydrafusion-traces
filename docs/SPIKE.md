@@ -165,10 +165,11 @@ joins them on `gen_ai.conversation.id`.
 ## Reproducing
 
 ```powershell
-$env:COPILOT_CLI_ENABLED_FEATURE_FLAGS = "HYDRAFUSION_ROLLOUT"
 $env:COPILOT_OTEL_FILE_EXPORTER_PATH = "$PWD\otel.jsonl"
 copilot -C .\sandbox -p "<task>" --model hydrafusion --allow-all-tools
 ```
 
-`--model hydrafusion` was accepted directly in 1.0.84-2 with the feature flag
-set. The flag is preview gating and is still required; without it the model is rejected.
+`--model hydrafusion` was accepted directly in 1.0.84-2. At the time of this spike
+the runs also set `COPILOT_CLI_ENABLED_FEATURE_FLAGS=HYDRAFUSION_ROLLOUT`, which was
+then required for preview gating. That gating has since been lifted, so the flag is no
+longer needed.
