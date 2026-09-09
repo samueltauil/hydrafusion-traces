@@ -9,18 +9,17 @@ dashboard.
 > HydraFusion is a research preview; everything here was observed from the outside and
 > will go out of date.
 
-HydraFusion is a research preview that runs several models in one turn — drafting,
-reviewing, and escalating — and returns a single answer and a single AI credit figure.
-It is a genuinely interesting piece of engineering, and from the outside it is opaque by
-construction: you get the result, not the route. Across 24 turns this stack saw **five
-distinct models** and three routing patterns.
+HydraFusion is a research preview that runs several models in one turn to draft, review,
+and escalate, then returns a single answer and a single AI credit figure. From the outside
+it is opaque by construction: you get the result, not the route. Across 24 turns this
+stack saw **five distinct models** and three routing patterns.
 
 The CLI already emits OpenTelemetry, and it emits it correctly. Each turn appears as one
 `chat` operation with `gen_ai.request.model=hydrafusion`, which is exactly what the
 [GenAI semantic conventions](https://opentelemetry.io/docs/specs/semconv/gen-ai/) ask for:
 the model the client requested. Those conventions have no field for a router that fans one
 request out across several models, so there is nowhere for the per-leg detail to go. This
-is a gap in the conventions meeting a genuinely new architecture, not a defect in the CLI.
+is a gap between the conventions and this routing architecture, not a defect in the CLI.
 
 The detail does exist locally. The CLI writes a structured record of every routing
 decision to its session log, where it powers resume and rewind. This repo reads that log,
@@ -78,7 +77,7 @@ If those lines appear, the dashboard has data.
 
 ### Just want to look around?
 
-No Copilot CLI and no HydraFusion access required — replay the cascade checked into
+No Copilot CLI or HydraFusion access is required. Replay the cascade checked into
 `fixtures/`:
 
 ```bash
@@ -150,7 +149,7 @@ Open any leg and the shape of the problem is on two lines:
 
 ![Span attributes](docs/screenshots/span-attributes.png)
 
-`gen_ai.request.model` is `hydrafusion` — the model requested, per the semantic
+`gen_ai.request.model` is `hydrafusion`, the model requested under the semantic
 conventions. `gen_ai.response.model` is `gpt-5.6-sol`, the model that served this leg. The
 tailer adds the second, along with the verdict, the token split, the credit cost, and
 whether this leg produced the answer you received.

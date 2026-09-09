@@ -1,4 +1,4 @@
-# Phase 0 Spike: what the CLI actually emits
+# Phase 0 spike: what the CLI actually emits
 
 Verified against **GitHub Copilot CLI 1.0.84-2** on Windows, 2026-09-09.
 Captured with `COPILOT_OTEL_FILE_EXPORTER_PATH`, no collector involved.
@@ -18,8 +18,8 @@ Span names are `{operation} {request_model}`, not `chat`:
 | Span name | Count in a 7-round-trip turn | Duration |
 |---|---|---|
 | `invoke_agent` | 1 | 99.9 s |
-| `chat hydrafusion` | 7 | 4–64 ms |
-| `execute_tool <name>` | 10 | 0–14 ms |
+| `chat hydrafusion` | 7 | 4-64 ms |
+| `execute_tool <name>` | 10 | 0-14 ms |
 
 In the runs observed here the `chat` span covers a few milliseconds, so it appears to
 measure client-side request handling rather than the model round trip: a turn that used
@@ -42,13 +42,13 @@ gen_ai.tool.definitions      (large JSON blob of tool names)
 
 Attributes the plan assumed, which are **not present in the span data**:
 
-- `gen_ai.response.model` — absent. Spans carry `gen_ai.request.model=hydrafusion`, which
+- `gen_ai.response.model` is absent. Spans carry `gen_ai.request.model=hydrafusion`, which
   is what the GenAI semantic conventions define that field to mean: the model the client
   requested. The conventions have no field for a router expanding one request into
   several model calls, so there is nothing for the CLI to populate here.
-- `github.copilot.nano_aiu` — absent from spans. Cost is recorded per phase in the
+- `github.copilot.nano_aiu` is absent from spans. Cost is recorded per phase in the
   session log instead.
-- `gen_ai.agent.name` — absent. Only `gen_ai.agent.id = github.copilot.default`
+- `gen_ai.agent.name` is absent. Only `gen_ai.agent.id = github.copilot.default`
   appears, and only as a metric dimension.
 
 ## What the metrics contain
@@ -66,10 +66,9 @@ Six instruments, all histograms except the MCP counter:
 
 No token metric, no cost metric, and `gen_ai.request.model` is always `hydrafusion`.
 
-**Conclusion: the OTel output describes the turn, and describes it accurately.** It tells
-you a turn happened, how long it took, how many inference and tool calls it made, and how
-the agent behaved. What it cannot express — because the conventions have no vocabulary for
-it — is that the turn was served by more than one model.
+The OTel output accurately describes the turn. It records that a turn happened, how long
+it took, how many inference and tool calls it made, and how the agent behaved. The
+conventions have no vocabulary for recording that more than one model served the turn.
 
 ## Where the per-leg detail lives
 
@@ -77,7 +76,7 @@ it — is that the turn was served by more than one model.
 there, fully structured. The file backs session resume and rewind; reading it for
 observability is a second use, not its purpose.
 
-### `session.fusion_resolved` — the routing decision
+### `session.fusion_resolved`: the routing decision
 
 ```json
 {"pattern":"cascade","policy":"max","routeSource":"capi_plan",
@@ -87,7 +86,7 @@ observability is a second use, not its purpose.
  "phasePlan":[{"kind":"primary","role":"solver","scope":"root","conditional":false}]}
 ```
 
-### `assistant.fusion_phase_completed` — one per leg, with per-leg cost
+### `assistant.fusion_phase_completed`: one event per leg, with cost
 
 ```json
 {"phaseKind":"judge","role":"judge","model":"gpt-5.6-sol","status":"succeeded",
@@ -100,11 +99,11 @@ observability is a second use, not its purpose.
 a `critique`. `role` observed: `solver`, `judge`, `critic`. Only `judge` phases carry a
 `verdict`; `critic` phases do not.
 
-### `session.fusion_handoff` — the escalation
+### `session.fusion_handoff`: the escalation
 
 Emitted between a rejecting judge and the repair phase.
 
-### `session.fusion_completed` — the turn rollup
+### `session.fusion_completed`: the turn rollup
 
 ```json
 {"pattern":"cascade","outcome":"completed","phaseCount":3,"requestCount":7,
@@ -129,9 +128,9 @@ numbers and conflating them would produce a wrong dashboard.
 | Retry policy for a non-idempotent payments API | `cascade` | 3 | `mai-code-1.1-flash` → `gpt-5.6-sol` (judge, **reject**) → `gpt-5.6-sol` (repair) | 14.72 | 77 s |
 | Mechanical rename across two files | `cascade` | 3 | `gpt-5.6-luna` → `gpt-5.6-sol` (judge, **reject**) → `gpt-5.6-sol` (repair) | 13.11 | 79 s |
 
-The router did not match the plan's prediction on any non-trivial prompt, in either
-direction. A hard debugging task with a failing test routed to `single`; a two-file rename
-routed to `cascade`. Our priors about difficulty and verifiability were simply poor.
+The router did not match the plan's prediction on any non-trivial prompt. A hard debugging
+task with a failing test routed to `single`; a two-file rename routed to `cascade`. Our
+assumptions about difficulty and verifiability did not fit these runs.
 `routeSource: capi_plan` says the decision is served remotely, so it can also be tuned
 without a CLI release.
 
@@ -142,9 +141,9 @@ breakdown.
 
 ## Decision gate
 
-The plan's "one span per turn" branch. The `events.jsonl` reader is **not optional polish,
-it is the product**. The dashboard is driven by the session log; OTel spans contribute the
-turn skeleton, the tool timeline, and agent metrics.
+The result follows the plan's "one span per turn" branch. The `events.jsonl` reader is the
+dashboard's primary data source, while OTel spans contribute the turn skeleton, tool
+timeline, and agent metrics.
 
 Revised framing: the CLI emits conformant OpenTelemetry for the turn, and separately
 records the per-leg detail in its session log for resume and rewind. Nothing is missing

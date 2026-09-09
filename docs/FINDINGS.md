@@ -40,9 +40,9 @@ Here is one leg of one turn as the tailer rebuilds it:
 
 | Pattern | Turns | Total AIU | Median AIU | Range | Mean wall |
 |---|---|---|---|---|---|
-| `single` | 18 | 187.03 | 7.97 | 2.25 – 36.24 | 27.7 s |
-| `cascade` | 3 | 30.22 | 14.72 | 2.39 – 14.72 | 63.8 s |
-| `critique` | 3 | 97.35 | 51.79 | 0.51 – 51.79 | 60.9 s |
+| `single` | 18 | 187.03 | 7.97 | 2.25-36.24 | 27.7 s |
+| `cascade` | 3 | 30.22 | 14.72 | 2.39-14.72 | 63.8 s |
+| `critique` | 3 | 97.35 | 51.79 | 0.51-51.79 | 60.9 s |
 
 **Do not read those columns as a cost comparison between patterns.** The router chooses
 the pattern based on the request, so pattern and task difficulty are confounded. A
@@ -64,8 +64,8 @@ Compound workflow rate was 25%: six of twenty-four turns used more than one mode
 | `mai-code-1.1-flash` | 0.92 | 0.3% | 2 |
 | `gpt-5.6-terra` | 0.19 | 0.1% | 1 |
 
-`claude-opus-5` appeared only for the heaviest tasks in the set — multi-file refactors and
-a delete-and-verify pass — and took 42% of total spend across three legs.
+`claude-opus-5` appeared only for the heaviest tasks in the set: multi-file refactors and
+a delete-and-verify pass. Its three legs took 42% of total spend.
 
 Treat those identifiers as routing labels observed in a preview, not as product names.
 They will change. The point of the table is that the pool is heterogeneous across vendors
@@ -76,23 +76,24 @@ which is meaningless at this sample size.
 
 `cascade` and `critique` are not variants of one mechanism.
 
-**`cascade`** runs `primary` → `judge` → `repair`, and the judge emits a verdict:
+**`cascade`** runs `primary` → `judge` → `repair`. The judge emits a verdict:
 
 ![Cascade with rejection](screenshots/cascade-waterfall.png)
 
 `mai-code-1.1-flash` drafted for 22 s and 0.58 AIU. `gpt-5.6-sol` reviewed it, returned
 `reject`, and produced the final answer itself in 42 s and 11.69 AIU.
 
-**`critique`** runs `draft` → `critic`, carries no verdict field, and commits the draft:
+**`critique`** runs `draft` → `critic`. It carries no verdict field and commits the draft:
 
 ![Critique](screenshots/critique-waterfall.png)
 
 `claude-opus-5` drafted for 1 m 46 s and 51.11 AIU; `gpt-5.6-sol` critiqued it for 5.7 s
 and 0.69 AIU. Here the review is a cheap pass over expensive work. In a cascade the judge
-is a gate that can add a second full attempt. Same idea, opposite cost profile.
+is a gate that can add a second full attempt. The two patterns have different cost
+profiles even though both include a review phase.
 
-Both compound patterns therefore need separate treatment in any cost model. Averaging them
-into one "multi-model" bucket would hide the only difference that matters.
+A cost model should treat the patterns separately. Averaging them into one "multi-model"
+bucket would hide how much work happens before and after review.
 
 ## The cascade gamble, both outcomes
 
@@ -107,13 +108,12 @@ AIU. `gpt-5.6-sol` reviewed it and accepted. Total: **2.39 AIU**, against a medi
 7.97 for `single` turns.
 
 The internal split is worth noting: review cost 2.05 AIU, the answer cost 0.34. The check
-cost six times the work it approved — and the turn was still roughly a fifth the median
-cost of a comparable single-model turn. That is the mechanism working. A cheap answer plus
-a cheap verification beat an expensive answer, and the verification is what makes the cheap
-answer trustworthy enough to ship.
+cost six times the work it approved, yet the turn was still roughly a fifth the median
+cost of a comparable single-model turn. In this case, most of the cost went to checking a
+cheap answer rather than producing it.
 
 That single example does not establish that the gamble pays off on average. It does show
-the payoff is real and that rejection is not the only outcome.
+that an accepted draft can cost less than a typical `single` turn in this sample.
 
 ## Where the credits went
 
@@ -128,7 +128,7 @@ the payoff is real and that rejection is not the only outcome.
 | `critic` | 1.48 |
 
 One leg per turn supplies the answer you receive. Across all 24 turns, the legs that did
-not amounted to **2.5% of spend** — 18 of 24 turns had no second leg at all.
+not amounted to **2.5% of spend**. Eighteen of 24 turns had no second leg at all.
 
 Two caveats on calling that number "overhead":
 
@@ -151,23 +151,22 @@ Across 24 turns and 96 inference calls (4.0 per turn):
 | Output | 25,713 |
 
 Input outweighs output roughly 59:1, and three quarters of input was served from cache.
-Any intuition that credits track visible output is wrong by two orders of magnitude — the
-bill is dominated by context, and cache behaviour matters more than answer length.
+Visible output is a poor proxy for credits in this sample. Context dominated the bill,
+and cache behaviour mattered more than answer length.
 
 This also explains an apparent oddity in the per-turn table: a short reply can cost more
 than a long one, because a cold cache on a large context is the expensive part.
 
 ## Routing cost
 
-Pattern selection took **172–371 ms** per turn (mean 229 ms) before any inference began.
+Pattern selection took **172-371 ms** per turn (mean 229 ms) before any inference began.
 `routeSource` was `capi_plan` and `policy` was `max` in all 24 turns, so the decision is
 served remotely rather than computed locally. `contractVersion`, `planVersion`, and
 `degradedReason` are all present in the event, which suggests the routing contract is
 versioned and has a fallback path. `degradedReason` was null throughout; we never
 triggered it.
 
-A fifth of a second to pick a route, against turns averaging 28–64 seconds, is a small
-price for the choice.
+The mean routing time was less than 1% of the 28-64 second mean wall times.
 
 ## Predicting the route from the prompt: mostly unsuccessful
 
@@ -182,16 +181,15 @@ price for the choice.
 
 One hit in six, wrong in both directions and at both ends of the difficulty range.
 
-The intuitive model — cheap draft for easy work, strong model for hard work, escalate when
-the draft is weak — did not predict this sample. A three-item lookup routed to `critique`
-across two models for 0.51 AIU. A subtle boundary bug with a failing test went straight to
-`single` on the strongest model.
+Our initial model was simple: use a cheap draft for easy work, a strong model for hard
+work, and escalate when the draft is weak. It did not predict this sample. A three-item
+lookup routed to `critique` across two models for 0.51 AIU. A subtle boundary bug with a
+failing test went straight to `single` on the strongest model.
 
-The honest conclusion is that our priors were poor and the sample is small, not that the
-routing is arbitrary. `routeSource: capi_plan` means the policy is served and can be tuned
-continuously, which is a sensible design for a preview and also means any rule inferred
-from two dozen turns on one machine would be stale quickly. That is a good argument for
-measuring it rather than reasoning about it, which is what this repo is for.
+The sample shows that our predictions were poor, not that the routing is arbitrary.
+`routeSource: capi_plan` means the policy is served and can be tuned without a CLI
+release. Any rule inferred from two dozen turns on one machine could become stale quickly,
+so the dashboard records what the router did instead of trying to encode those rules.
 
 ## Cross-checks
 
@@ -209,10 +207,9 @@ made 7 inference calls and 10 tool calls. `phaseCount` counts fusion legs; `requ
 counts inference calls. Conflating them would inflate the compound rate by roughly the
 tool-use depth of the task.
 
-## What the session log surfaces that the client does not
+## Detail available in the session log
 
-Not as a criticism of the CLI's UI, which deliberately keeps the turn simple — just as a
-list of what becomes available once you read the log:
+The CLI keeps each turn simple. Reading the session log adds:
 
 - The model that served each leg.
 - Reviewer verdicts, the cost of each reviewed draft, and which leg produced the answer.
