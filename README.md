@@ -1,4 +1,4 @@
-# hydrafusion-traces
+# Observe HydraFusion model routing
 
 See which models GitHub Copilot CLI's HydraFusion ran for each turn, in a Grafana
 dashboard.
@@ -119,10 +119,15 @@ Either way the dashboard and datasources reprovision themselves on the next `up`
 
 ## How it works
 
-```
-copilot CLI ──OTLP──▶ collector ──▶ Tempo ─┐
-                          ▲                ├──▶ Grafana
-   events.jsonl ──▶ tailer┘  └──▶ Prometheus┘
+```mermaid
+flowchart LR
+    CLI["GitHub Copilot CLI"] -->|"OTLP spans and metrics"| Collector["OpenTelemetry Collector"]
+    Events["events.jsonl"] --> Tailer["Fusion tailer"]
+    Tailer -->|"OTLP traces and metrics"| Collector
+    Collector -->|"traces"| Tempo
+    Collector -->|"metrics"| Prometheus
+    Tempo --> Grafana
+    Prometheus --> Grafana
 ```
 
 Two sources feed the same stack.
